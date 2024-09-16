@@ -13,9 +13,9 @@ from langchain.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain_community.document_loaders import PyMuPDFLoader, Docx2txtLoader
 from langchain_community.document_loaders.csv_loader import CSVLoader
+from langchain_openai import OpenAIEmbeddings
 from dotenv import load_dotenv
 load_dotenv()
-from langchain_openai import OpenAIEmbeddings
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 embedding_model = OpenAIEmbeddings(model="text-embedding-3-large")
@@ -92,7 +92,7 @@ def get_unique_documents(docs:list):
 def qa_ret(qdrant_store,input_query):
     try:
         template = """You are a helpful assistant.Your task is to answer user questions based on given context . If a user asks about any question about it, please assist them courteously and always give your best effort.Please do your best because it is very important to my career.
-        and please return response always in roman urdu language if user ask any language you should be always respond in urdu language.
+        please make sure always return response in roman urdu language like i mean hinglish.
         {context}
         Question: {question}
         """
