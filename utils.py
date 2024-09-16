@@ -98,7 +98,7 @@ def qa_ret(qdrant_store,input_query):
         setup_and_retrieval = RunnableParallel(
                 {"context": retriever | get_unique_documents , "question": RunnablePassthrough()})
         
-        model = ChatOpenAI(model = "gpt-3.5-turbo", openai_api_key = OPENAI_API_KEY, temperature=0.3)
+        model = ChatOpenAI(model = "gpt-4o-mini", openai_api_key = OPENAI_API_KEY, temperature=0.3)
         output_parser= StrOutputParser()
         rag_chain = (
         setup_and_retrieval
