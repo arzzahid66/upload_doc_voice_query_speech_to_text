@@ -5,6 +5,9 @@ import streamlit as st
 from st_audiorec import st_audiorec
 from utils import upload_file_and_preprosses , qa_retrieval 
 load_dotenv()
+from streamlit_mic_recorder import speech_to_text
+import boto3
+from contextlib import closing
 
 API_KEY = os.getenv("OPENAI_API_KEY")
 st.markdown("""
@@ -69,12 +72,44 @@ def chat_completion_call(text):
 #     response = client.chat.completions.create(model="gpt-3.5-turbo", messages=messages)
 #     return response.choices[0].message.content
 
+def text_to_speech_ai(response_text):
+    polly = boto3.client(
+        'polly',
+        region_name='us-east-1',
+        aws_access_key_id=os.getenv("aws_access_key_id"),
+        aws_secret_access_key=os.getenv("aws_secret_access_key")
+    )
+
+    try:
+        # Synthesize speech
+        polly_response = polly.synthesize_speech(Text=response_text, OutputFormat="mp3", VoiceId="Aditi")
+
+        # Log response metadata for debugging
+        print("Polly Response Metadata:", polly_response.get('ResponseMetadata', {}))
+
+        # Check for audio stream in Polly response
+        if "AudioStream" in polly_response:
+            with closing(polly_response["AudioStream"]) as stream:
+                audio_content = stream.read()
+                # Save the MP3 file
+                with open("output.mp3", "wb") as file:
+                    file.write(audio_content)
+                print("Audio saved to output.mp3")
+                return audio_content
+        else:
+            print("AudioStream not found in Polly response.")
+            return None
+    except Exception as error:
+        print(f"Error synthesizing speech: {error}")
+        return None
 # Convert text to speech
-def text_to_speech_ai(response):
-    client = OpenAI(api_key=API_KEY)
-    tts_response = client.audio.speech.create(model="tts-1", voice="nova", input=response)
-    audio_content = tts_response.content  # Get audio content as bytes
-    return audio_content
+# def text_to_speech_ai(response):
+#     client = OpenAI(api_key=API_KEY)
+#     tts_response = client.audio.speech.create(model="tts-1-hd", voice="nova", input=response)
+#     audio_content = tts_response.content  # Get audio content as bytes
+#     return audio_content
+
+
 query_method = st.radio("Select Query Method", ("Text", "Audio"))
 if query_method == "Text":
     # Initialize session state
@@ -103,29 +138,44 @@ if query_method == "Text":
                 audio_file.write(st.session_state.audio_content)
             st.audio(audio_file_path, format='audio/mp3', start_time=0)
 
+
 if query_method == "Audio":
-    # Initialize session state
-    response = ""
-    aud_content = None
-
-    wav_audio_data = st_audiorec()
-    audio_file_path = "ai_response_audio.mp3"
-    if wav_audio_data is not None:
-        audio_location = "audio_file.wav"
-        with open(audio_location, "wb") as f:
-            f.write(wav_audio_data)
-        response = transcribe_voice_to_text(audio_location)
-        st.write("Human Question: ", response)
-        response = chat_completion_call(response)
-        st.write("AI Response: ", response)
-
+    # Initialize session state for audio response
+    if "ai_response_text_audio" not in st.session_state:
+        st.session_state.ai_response_text_audio = ""
+    if "audio_content_audio" not in st.session_state:
+        st.session_state.audio_content_audio = None
+    
+    # Use speech-to-text for audio input
+    text = speech_to_text(use_container_width=True, just_once=True, key="STT")
+    
+    if text:
+        st.write(f"Transcribed Text: {text}")
+        # Get AI response from transcribed text
+        ai_response_text_audio = chat_completion_call(text)
+        st.write("AI Response: ", ai_response_text_audio)
+        st.session_state.ai_response_text_audio = ai_response_text_audio
+        st.session_state.audio_content_audio = None  # Reset audio content for new query
+    
     # Show Play button if AI response is available
-    if response:
-        if st.button("Play AI Response Audio"):
+    if st.session_state.ai_response_text_audio:
+        if st.button("Play AI Response Audio (Audio Query)"):
             # Generate audio content for the AI response only when the button is clicked
-            if not aud_content:
-                aud_content = text_to_speech_ai(response)
+            if not st.session_state.audio_content_audio:
+                st.session_state.audio_content_audio = text_to_speech_ai(st.session_state.ai_response_text_audio)
+            # Save and play the audio response
             audio_file_path = "ai_response_audio.mp3"
             with open(audio_file_path, "wb") as audio_file:
-                audio_file.write(aud_content)
+                audio_file.write(st.session_state.audio_content_audio)
             st.audio(audio_file_path, format='audio/mp3', start_time=0)
+
+    # Show Play button if AI response is available
+    # if response:
+    #     if st.button("Play AI Response Audio"):
+    #         # Generate audio content for the AI response only when the button is clicked
+    #         if not aud_content:
+    #             aud_content = text_to_speech_ai(response)
+    #         audio_file_path = "ai_response_audio.mp3"
+    #         with open(audio_file_path, "wb") as audio_file:
+    #             audio_file.write(aud_content)
+    #         st.audio(audio_file_path, format='audio/mp3', start_time=0)
