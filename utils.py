@@ -1,12 +1,11 @@
 import streamlit as st
 import os
-from langchain.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Qdrant
 import openai
 from langchain_community.vectorstores.qdrant import Qdrant
 from qdrant_client import QdrantClient
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceBgeEmbeddings
+# from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import  RunnablePassthrough, RunnableParallel
 from langchain.prompts import ChatPromptTemplate
@@ -18,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-embedding_model = OpenAIEmbeddings(model="text-embedding-3-large")
+embedding_model = OpenAIEmbeddings(model="text-embedding-3-small")
 def upload_file_and_preprosses():
     os.makedirs("uploads", exist_ok=True)
     file_path = None  # Initialize file_path
@@ -46,12 +45,12 @@ def upload_file_and_preprosses():
                 def split_doc(pages):
                     text_splitter = RecursiveCharacterTextSplitter(
                         chunk_size=700,
-                        chunk_overlap=70,
+                        chunk_overlap=50,
                         length_function=len,
                         is_separator_regex=False)
                     texts = text_splitter.split_documents(pages)
                     return texts
-
+               
                 text_new = split_doc(pages)
                 qdrant_key = os.getenv("QDRANT_KEY")
                 URL = os.getenv("URL")
@@ -72,7 +71,7 @@ def upload_file_and_preprosses():
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
 def qdrant_client():
-        embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        embedding_model = OpenAIEmbeddings(model="text-embedding-3-small")
         qdrant_key = os.getenv("QDRANT_KEY")
         URL = os.getenv("URL")
         qdrant_client = QdrantClient(
@@ -91,10 +90,15 @@ def get_unique_documents(docs:list):
      
 def qa_ret(qdrant_store,input_query):
     try:
-        template = """You are a helpful assistant.Your task is to answer user questions based on given context . If a user asks about any question about it, please assist them courteously and always give your best effort.Please do your best because it is very important to my career.
-        please make sure always return response in roman urdu language like i mean hinglish.
+        template = """
+        You are a helpful and dedicated female assistantt. Your primary role is to assist the user by providing accurate 
+        and thoughtful answers based on the given context. If the user asks any questions related to the provided 
+        information, respond in a courteous and professional manner.
+        It is important to always give your best effort, as your assistance plays a crucial role in the user’s 
+        career success. Ensure that your responses are clear, concise, and well-structured.
+        **Note:** Always provide your responses in Roman Urdu (Hinglish) to maintain the preferred language format.
         {context}
-        Question: {question}
+        **Question:** {question}
         """
         prompt = ChatPromptTemplate.from_template(template)
         retriever= qdrant_store.as_retriever(search_type="similarity", search_kwargs={"k":4})
